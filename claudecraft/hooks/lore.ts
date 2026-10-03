@@ -99,6 +99,30 @@ export function toolGlyph(tool: string): string {
   return TOOL_GLYPHS[tool] ?? '🧱'
 }
 
+// What a tool call reads as in chat, the way the game reports an operator's
+// command: `ran pytest -q` inside `[Claude: ran pytest -q]`.
+export function chatAction(tool: string, input: unknown, root: string): string {
+  const given = (input ?? {}) as Record<string, unknown>
+  const text = (key: string) => (typeof given[key] === 'string' ? (given[key] as string) : '')
+  const short = (value: string, most = 72) => {
+    const line = (value.split('\n')[0] ?? '').trim()
+    return line.length > most ? line.slice(0, most - 1) + '…' : line
+  }
+  const path = (value: string) => (root && value.startsWith(root + '/') ? value.slice(root.length + 1) : value)
+  if (tool === 'Bash') return 'ran ' + short(text('command'))
+  if (tool === 'Read') return 'read ' + path(text('file_path'))
+  if (tool === 'Edit' || tool === 'NotebookEdit') return 'edited ' + path(text('file_path') || text('notebook_path'))
+  if (tool === 'Write') return 'wrote ' + path(text('file_path'))
+  if (tool === 'Grep') return 'searched for ' + short(text('pattern'), 40)
+  if (tool === 'Glob') return 'looked for ' + short(text('pattern'), 40)
+  if (tool === 'Agent' || tool === 'Task') return 'sent a villager to ' + short(text('description') || 'help', 48)
+  if (tool === 'Skill') return 'used the skill ' + text('skill')
+  if (tool === 'WebFetch') return 'fetched ' + short(text('url'), 60)
+  if (tool === 'WebSearch') return 'searched the web for ' + short(text('query'), 48)
+  if (tool.startsWith('mcp__')) return 'used ' + tool.split('__').slice(1).join(' ')
+  return 'used ' + tool
+}
+
 const DEATHS = [
   'fell from a high place',
   'was blown up by Creeper',
@@ -368,4 +392,251 @@ export function logoRows(word: string): string[] {
     }
   }
   return rows
+}
+
+// A picture for the terminal's cell grid: its size in cells and the packed cells
+export type Picture = { columns: number; rows: number; cells: string }
+
+const CLEAR = 0x01000000
+
+function base64(bytes: Uint8Array): string {
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  let out = ''
+  for (let at = 0; at < bytes.length; at += 3) {
+    const a = bytes[at] ?? 0
+    const b = bytes[at + 1] ?? 0
+    const c = bytes[at + 2] ?? 0
+    out += letters[a >> 2]! + letters[((a & 3) << 4) | (b >> 4)]!
+    out += at + 1 < bytes.length ? letters[((b & 15) << 2) | (c >> 6)]! : '='
+    out += at + 2 < bytes.length ? letters[c & 63]! : '='
+  }
+  return out
+}
+
+// Packs rows of pixels (a color, or undefined for see-through) into cells: two
+// pixel rows to a text row, drawn with half blocks.
+export type Stamp = { text: string; row: number; column: number; color: number; back: number }
+
+export function paint(pixels: (number | undefined)[][], stamps: Stamp[] = []): Picture {
+  const columns = Math.max(...pixels.map(row => row.length))
+  const rows = Math.ceil(pixels.length / 2)
+  const words = new Uint32Array(columns * rows * 3)
+  for (let row = 0; row < rows; row++) {
+    for (let column = 0; column < columns; column++) {
+      const top = pixels[row * 2]?.[column]
+      const bottom = pixels[row * 2 + 1]?.[column]
+      const at = (row * columns + column) * 3
+      if (top === undefined && bottom === undefined) words.set([0x20, CLEAR, CLEAR], at)
+      else if (bottom === undefined) words.set([0x2580, top!, CLEAR], at)
+      else if (top === undefined) words.set([0x2584, bottom, CLEAR], at)
+      else words.set([0x2580, top, bottom], at)
+    }
+  }
+  // Short labels written over cells, as a stack's count is
+  for (const stamp of stamps) {
+    ;[...stamp.text].forEach((letter, index) => {
+      const column = stamp.column + index
+      if (column < 0 || column >= columns || stamp.row >= rows) return
+      words.set([letter.charCodeAt(0), stamp.color, stamp.back], (stamp.row * columns + column) * 3)
+    })
+  }
+  return { columns, rows, cells: base64(new Uint8Array(words.buffer)) }
+}
+
+function sprite(art: string[], palette: Record<string, number>): Picture {
+  return paint(art.map(row => [...row].map(letter => palette[letter])))
+}
+
+// The player's head, front on, as the game's default skin wears it
+export const HEAD_PLAYER = sprite(['hhhhhh', 'hssssh', 'ssssss', 'wessew', 'ssnnss', 'smmmms'], {
+  h: 0x2f1f0f,
+  s: 0xbb8a66,
+  w: 0xffffff,
+  e: 0x4a3fb5,
+  n: 0x8f5f44,
+  m: 0x5a3622,
+})
+
+// Claude's head: a clay block with two eyes
+export const HEAD_CLAUDE = sprite(['llllll', 'cccccc', 'ckcckc', 'cccccc', 'cckkcc', 'dddddd'], {
+  l: 0xeaa083,
+  c: 0xd97757,
+  d: 0xa9553b,
+  k: 0x2b1a14,
+})
+
+// What sits in a hotbar slot for each kind of tool, six pixels square: a dark
+// outline, a lit side and a shaded one, as the game's item sprites have
+const ITEM_COLORS: Record<string, number> = {
+  d: 0x4aedd9, // diamond
+  D: 0x1f9c8f,
+  i: 0xb5fff5,
+  s: 0x9a6a3a, // stick, wood
+  S: 0x5c3a1c,
+  r: 0xc81e10, // redstone
+  R: 0xff4a36,
+  q: 0x7a0c06,
+  b: 0xa8452f, // brick
+  B: 0x7d2f1f,
+  m: 0x6e5a50, // mortar
+  w: 0xf4f4f4, // paper, pages
+  W: 0xc8c8c8,
+  g: 0xa8a8a8, // iron, stone
+  G: 0x6c6c6c,
+  k: 0x2b2b2b,
+  y: 0xffd83d, // gold
+  p: 0xa85cf0, // enchanted
+  P: 0x5a1f8f,
+  e: 0x17dd62, // emerald
+  E: 0x9cffc0,
+  F: 0x0b8a3c,
+  c: 0x8a5a36, // leather
+  C: 0x4a2d14,
+}
+const ITEMS: Record<string, string[]> = {
+  pickaxe: ['.DDDD.', 'DiddDD', '..SsdD', '.Ss.dD', 'Ss..D.', 'S.....'],
+  book: ['.CCCC.', 'CccccW', 'CcCCcW', 'CccccW', 'CCCCCW', '.wwww.'],
+  bricks: ['bbmbbb', 'BBmBBB', 'mmmmmm', 'bbbbmb', 'BBBBmB', 'mmmmmm'],
+  redstone: ['......', '..R...', '.rRr..', 'qrRRr.', '.qrRRr', '..qqq.'],
+  compass: ['.GGGG.', 'GkkkRG', 'GkkRkG', 'GkwkkG', 'GwkkkG', '.GGGG.'],
+  emerald: ['..FF..', '.FEeF.', 'FEeeeF', 'FeeeeF', '.FeeF.', '..FF..'],
+  enchanted: ['.PPPP.', 'PppppW', 'PpyypW', 'PpyypW', 'PPPPPW', '.wwww.'],
+  chest: ['CCCCCC', 'CssssC', 'CCyyCC', 'CsyysC', 'CssssC', 'CCCCCC'],
+  paper: ['.wwwW.', '.wGGw.', '.wwww.', '.wGGw.', '.wwww.', '.WWWW.'],
+  stone: ['gggGgg', 'gGgggg', 'ggggGg', 'Gggggg', 'ggGggg', 'gggggG'],
+}
+const TOOL_ITEMS: Record<string, string> = {
+  Grep: 'pickaxe',
+  Glob: 'pickaxe',
+  Read: 'book',
+  Edit: 'bricks',
+  Write: 'bricks',
+  NotebookEdit: 'bricks',
+  Bash: 'redstone',
+  WebSearch: 'compass',
+  WebFetch: 'compass',
+  Agent: 'emerald',
+  Task: 'emerald',
+  Skill: 'enchanted',
+  TodoWrite: 'paper',
+}
+
+// The item a tool holds in the hotbar, by its sprite's name
+export function itemOf(tool: string): string {
+  return tool.startsWith('mcp__') ? 'chest' : (TOOL_ITEMS[tool] ?? 'stone')
+}
+
+// The experience bar alone, one row: the level, then a thin notched bar
+export function xpPicture(width: number, level: number, into: number, cost: number): Picture {
+  const label = 'Lv ' + level + ' '
+  const span = Math.max(1, width - label.length)
+  const filled = cost <= 0 ? 0 : Math.max(0, Math.min(span, Math.round((into / cost) * span)))
+  const top: (number | undefined)[] = new Array(width).fill(undefined)
+  const bottom: (number | undefined)[] = new Array(width).fill(undefined)
+  for (let x = 0; x < span; x++) {
+    const isNotch = x % 8 === 7
+    bottom[label.length + x] = x < filled ? (isNotch ? 0x4fa010 : 0x80ff20) : isNotch ? 0x1c1c1c : 0x3a3a3a
+  }
+  return paint([top, bottom], [{ text: label, row: 0, column: 0, color: 0x80ff20, back: CLEAR }])
+}
+
+// One hotbar slot, eight pixels square: the tool's item inside the slot's
+// frame, its use count in the corner, and a white frame on the tool in hand
+export function slotPicture(tool: string, uses: number, isHeld: boolean): Picture {
+  const back = 0x2a2a2a
+  const frame = isHeld ? 0xffffff : 0x7a7a7a
+  const art = ITEMS[tool.startsWith('mcp__') ? 'chest' : (TOOL_ITEMS[tool] ?? 'stone')]!
+  const edge = new Array(8).fill(frame)
+  const pixels = [edge, ...art.map(row => [frame, ...[...row].map(letter => ITEM_COLORS[letter] ?? back), frame]), edge]
+  // The count sits on the frame's corner, so the frame stays whole
+  const count = String(uses)
+  return paint(pixels, [{ text: count, row: 3, column: 8 - count.length, color: isHeld ? 0x000000 : 0xffffff, back: frame }])
+}
+
+// The HUD icons, three pixels wide: a heart and a drumstick are two tall, and
+// an armor point is a single plate over its heart. `1` is the lit pixel, `2` the
+// body, `3` the shaded one; a half heart keeps its left column
+const HEART = ['1.2', '.3.']
+const PLATE = ['122']
+const DRUMSTICK = ['.12', 'b3.']
+const TINTS = {
+  heart: { '1': 0xff8a8a, '2': 0xff1a1a, '3': 0xb00c0c, b: 0, off: 0x4a1c1c },
+  hurt: { '1': 0xffffff, '2': 0xffffff, '3': 0xdddddd, b: 0, off: 0x4a1c1c },
+  plate: { '1': 0xf4f4f4, '2': 0xc4c4c4, '3': 0x8c8c8c, b: 0, off: 0x3a3a3a },
+  food: { '1': 0xe89a4a, '2': 0xc8792d, '3': 0x8f4f1a, b: 0xf0e8d8, off: 0x3a2a1c },
+}
+
+// The game's HUD in one picture: armor over hearts on the left, food on the
+// right, and the experience bar under both with the level at its start.
+// `health` is in half hearts (0 to 20); `armor` and `food` count whole icons
+// (0 to 10) and are left out when undefined.
+export function hudPicture(state: { health: number; isHurt: boolean; armor?: number; food?: number; level: number; into: number; cost: number }): Picture {
+  const width = state.food === undefined ? 39 : 81
+  const pixels: (number | undefined)[][] = []
+  const blank = () => new Array<number | undefined>(width).fill(undefined)
+  const draw = (rows: (number | undefined)[][], art: string[], x: number, tint: Record<string, number>, lit: 'full' | 'half' | 'off') => {
+    art.forEach((line, y) => {
+      ;[...line].forEach((letter, column) => {
+        if (letter === '.') return
+        const isLit = lit === 'full' || (lit === 'half' && column === 0)
+        rows[y]![x + column] = isLit ? tint[letter] : tint.off
+      })
+    })
+  }
+  if (state.armor !== undefined) {
+    const rows = [blank()]
+    for (let i = 0; i < 10; i++) draw(rows, PLATE, i * 4, TINTS.plate, i < state.armor ? 'full' : 'off')
+    pixels.push(...rows, blank())
+  }
+  const rows = [blank(), blank()]
+  for (let i = 0; i < 10; i++) {
+    const left = state.health - i * 2
+    draw(rows, HEART, i * 4, state.isHurt ? TINTS.hurt : TINTS.heart, left >= 2 ? 'full' : left === 1 ? 'half' : 'off')
+  }
+  // Food empties from the left, as the game's right-anchored bar does
+  if (state.food !== undefined) {
+    for (let i = 0; i < 10; i++) draw(rows, DRUMSTICK, 42 + i * 4, TINTS.food, i >= 10 - state.food ? 'full' : 'off')
+  }
+  pixels.push(...rows)
+  // A thin bar, as the game's is; it starts after the level's label, which is stamped on its row
+  const label = 'Lv ' + state.level + ' '
+  const span = width - label.length
+  const filled = state.cost <= 0 ? 0 : Math.max(0, Math.min(span, Math.round((state.into / state.cost) * span)))
+  const top = blank()
+  const bottom = blank()
+  for (let x = 0; x < span; x++) {
+    const isNotch = x % 8 === 7
+    bottom[label.length + x] = x < filled ? (isNotch ? 0x4fa010 : 0x80ff20) : isNotch ? 0x1c1c1c : 0x3a3a3a
+  }
+  pixels.push(top, bottom)
+  return paint(pixels, [{ text: label, row: pixels.length / 2 - 1, column: 0, color: 0x80ff20, back: CLEAR }])
+}
+
+// The title as the game opens on it: stone letters lit from above, standing
+// on a strip of grass and dirt
+export function titleScene(word: string): Picture {
+  const width = word.length * 4 + 1
+  const stone = [0xf2f2f2, 0xd0d0d0, 0xb0b0b0, 0x8e8e8e, 0x6c6c6c]
+  const pixels: (number | undefined)[][] = []
+  for (let row = 0; row < 5; row++) {
+    const line: (number | undefined)[] = new Array(width).fill(undefined)
+    ;[...word].forEach((letter, index) => {
+      const glyph = FONT[letter]
+      for (let column = 0; column < 3; column++) {
+        if (glyph?.[row]?.[column] === '1') line[1 + index * 4 + column] = stone[row]
+      }
+    })
+    pixels.push(line)
+  }
+  pixels.push(new Array(width).fill(undefined))
+  const ground = [
+    [0x7cbd4f, 0x6aa83f],
+    [0x5e9a36, 0x6aa83f],
+    [0x8a5a36, 0x6e4527],
+    [0x7a4e2e, 0x8a5a36],
+  ]
+  for (const [main, speck] of ground) {
+    pixels.push(Array.from({ length: width }, (_, x) => ((x * 7 + pixels.length * 13) % 5 === 0 ? speck : main)))
+  }
+  return paint(pixels)
 }

@@ -1,6 +1,6 @@
 {
   "name": "claudecraft",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A Minecraft HUD for Claude Code: hearts for context, armor for safety nets, XP for verified work, and 60 advancements that persist across sessions",
   "author": { "name": "mkpvishnu" },
   "homepage": "https://github.com/mkpvishnu/claude-mods/tree/main/claudecraft",

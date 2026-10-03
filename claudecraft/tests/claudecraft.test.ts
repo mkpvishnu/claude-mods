@@ -103,12 +103,7 @@ test('a failed call draws a death message over its error', async ($, on) => {
   await ui.unmount()
 })
 
-test('a failed call folded into a group is listed under its count line', async ($, on) => {
-  on('ui.render', { component: 'ToolGroup' }, ($, e) => {
-    const { Text } = $.ui.resolve(e)
-    return Text({ children: 'Ran 2 shell commands' })
-  })
-
+test('a folded group draws each call as a chat line, with a death under the failed one', async $ => {
   const call = { isRunning: false, isInterrupted: false, tool: 'Bash' }
   const ui = await $.ui.mount({
     plugin: 'claudecraft',
@@ -123,17 +118,26 @@ test('a failed call folded into a group is listed under its count line', async (
       ],
     },
   })
-  expect(await ui.find({ type: 'Text', text: 'Ran 2 shell commands' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '[Claude: ran ls]' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: '[Claude: ran pytest -q]' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /☠ pytest .* \(exit 1\)/ })).toBeDefined()
   await ui.unmount()
 })
 
-test('the band shows the title, ten hearts and the level', async $ => {
+test('the band paints the title and the HUD, and falls back to glyphs where it is narrow', async $ => {
   const ui = await $.ui.mount({ plugin: 'claudecraft', surface: 'terminal', component: 'AbovePrompt', props: BAND })
-  expect(await ui.find({ type: 'Text', text: /^█▀▀ █/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: '♥' })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /^Lv \d+$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Raster' })).toBeDefined()
   await ui.unmount()
+
+  const narrow = await $.ui.mount({
+    plugin: 'claudecraft',
+    surface: 'terminal',
+    component: 'AbovePrompt',
+    props: { ...BAND, bodyColumns: 30 },
+  })
+  expect(await narrow.find({ type: 'Text', text: '♥' })).toBeDefined()
+  expect(await narrow.find({ type: 'Text', text: /^Lv \d+$/ })).toBeDefined()
+  await narrow.unmount()
 })
 
 test('the advancements screen lights the earned cards and locks the ones behind them', async ($, on) => {
@@ -194,4 +198,40 @@ test('a commit after a green run is a verified one, and every check green makes 
   const answer = await $.command.run(INVENTORY)
   expect(answer.text).toContain('A Furious Cocktail')
   expect(answer.text).toContain('Diamonds!')
+})
+
+test('a prompt and a reply are chat lines under their names', async $ => {
+  const prompt = await $.ui.mount({
+    plugin: 'claudecraft',
+    surface: 'terminal',
+    component: 'UserMessage',
+    requestId: 'row_1',
+    props: { text: 'build a house', origin: { kind: 'composer' }, isExpanded: true },
+  })
+  expect(await prompt.find({ type: 'Text', text: /^<.+>$/ })).toBeDefined()
+  expect(await prompt.find({ type: 'Text', text: 'build a house' })).toBeDefined()
+  expect(await prompt.find({ type: 'Text', text: / joined the game$/ })).toBeDefined()
+  await prompt.unmount()
+
+  const reply = await $.ui.mount({
+    plugin: 'claudecraft',
+    surface: 'terminal',
+    component: 'AssistantMessage',
+    props: { text: 'The house is built.', isFirstOfReply: true },
+  })
+  expect(await reply.find({ type: 'Text', text: '<Claude>' })).toBeDefined()
+  expect(await reply.find({ type: 'Markdown', text: 'The house is built.' })).toBeDefined()
+  await reply.unmount()
+})
+
+test('a tool call is reported the way the game reports a command', async $ => {
+  const ui = await $.ui.mount({
+    plugin: 'claudecraft',
+    surface: 'terminal',
+    component: 'ToolUse',
+    requestId: 'toolu_1',
+    props: { tool_use_id: 'toolu_1', tool: 'Bash', input: { command: 'pytest -q' }, isRunning: false, isErrored: false, isInterrupted: false },
+  })
+  expect(await ui.find({ type: 'Text', text: '[Claude: ran pytest -q]' })).toBeDefined()
+  await ui.unmount()
 })

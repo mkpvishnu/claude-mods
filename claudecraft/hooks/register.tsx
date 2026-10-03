@@ -26,6 +26,14 @@ import {
   spinnerWord,
   streakEnding,
   toolGlyph,
+  chatAction,
+  HEAD_CLAUDE,
+  HEAD_PLAYER,
+  titleScene,
+  slotPicture,
+  hudPicture,
+  itemOf,
+  xpPicture,
   type Advancement,
 } from './lore.ts'
 
@@ -96,6 +104,12 @@ let turnAgents = 0
 let isHurt = false
 let isTicking = false
 let splash = ''
+// The name chat lines carry for the person at the prompt
+let player = 'Steve'
+const TITLE = titleScene('CLAUDECRAFT')
+// Where the sprite files are, once the terminal is known to show pictures
+// (kitty and Ghostty do); empty elsewhere, and the cell-grid art is drawn
+let sprites = ''
 let shownTab = 0
 // Tool calls running now, oldest first; the spinner names the newest
 const active: { id: string; tool: string; label: string; startedAt: number; timeoutMs: number }[] = []
@@ -281,7 +295,9 @@ async function grant($: EngineInterface, advancement: Advancement) {
   // The game's three toasts, by frame
   const made = advancement.frame === 'challenge' ? 'Challenge Complete!' : advancement.frame === 'goal' ? 'Goal Reached!' : 'Advancement Made!'
   $.ui.toast(made + '  ' + advancement.icon + ' ' + advancement.title, { timeoutMs: 6000 })
-  $.ui.log(made + ' [' + advancement.title + ']' + (advancement.xp ? ' +' + advancement.xp + ' XP' : ''))
+  // The line the game writes in chat for each frame
+  const did = advancement.frame === 'challenge' ? ' has completed the challenge [' : advancement.frame === 'goal' ? ' has reached the goal [' : ' has made the advancement ['
+  $.ui.log(player + did + advancement.title + ']' + (advancement.xp ? ' +' + advancement.xp + ' XP' : ''))
   if (advancement.xp) gain($, advancement.xp)
   let stored: unknown
   try {
@@ -411,6 +427,10 @@ export const register: Register = on => {
     hungerPercent = usage.rateLimits.find(limit => limit.kind === 'five_hour')?.percentUsed
     const now = await clockNow($)
     splash = pick(SPLASHES, sessionId)
+    player = (await $.env.get('USER')) || player
+    const terminal = ((await $.env.get('TERM_PROGRAM')) ?? '') + ' ' + ((await $.env.get('TERM')) ?? '')
+    const hasPictures = /ghostty|kitty/i.test(terminal) || Boolean(await $.env.get('KITTY_WINDOW_ID'))
+    sprites = hasPictures && (await $.session.surface()) === 'terminal' ? $.plugin.root + '/assets/' : ''
     today = dayOf(now)
     if (!life.firstDay) {
       life.firstDay = today
@@ -788,13 +808,51 @@ export const register: Register = on => {
   // A call through a skill or an MCP server is borrowed power: the dot of
   // its row is drawn over with the enchantment glint
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
-    if (e.props.tool !== 'Skill' && !e.props.tool.startsWith('mcp__')) return next(e)
+    // The game reports an operator's command in chat as a gray italic
+    // `[Name: what it did]`; a skill or MCP tool, being enchanted, carries the glint
     const { Box, Text } = $.ui.resolve(e)
+    const isEnchanted = e.props.tool === 'Skill' || e.props.tool.startsWith('mcp__')
+    const color = e.props.isErrored ? COLOR.red : e.props.isRunning ? COLOR.white : COLOR.gray
+    const tail = e.props.isInterrupted ? ' (interrupted)' : e.props.isRunning ? '…' : ''
     return (
-      <Box flexDirection="column">
-        {await next(e)}
-        <Box position="absolute" top={0} left={0}>
-          <Text color={COLOR.purple}>✦</Text>
+      <Box flexDirection="row" gap={1}>
+        {isEnchanted ? <Text color={COLOR.purple}>✦</Text> : null}
+        <Text color={color} italic wrap="truncate">
+          {'[Claude: ' + chatAction(e.props.tool, e.props.input, root) + tail + ']'}
+        </Text>
+      </Box>
+    )
+  })
+
+  // A reply is a chat line from Claude: the name opens the reply and the
+  // blocks after it sit under its text
+  on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
+    const elements = $.ui.resolve(e)
+    const { Box, Text, Markdown } = elements
+    // Only the terminal has the cell grid the heads are painted on
+    const Raster = 'Raster' in elements ? elements.Raster : undefined
+    // A picture of the head where the terminal shows pictures, the cell-grid
+    // one elsewhere
+    const Picture = sprites && 'Image' in elements ? elements.Image : undefined
+    if (!e.props.isFirstOfReply) {
+      return (
+        <Box paddingLeft={(Picture ? 4 : HEAD_CLAUDE.columns) + 1}>
+          <Markdown text={e.props.text} />
+        </Box>
+      )
+    }
+    return (
+      <Box flexDirection="row" gap={1} marginTop={1}>
+        {Picture ? (
+          <Picture source={{ file: sprites + 'head-claude.png', format: 'png' }} columns={4} rows={2} alt=" " />
+        ) : Raster ? (
+          <Raster key="head" {...HEAD_CLAUDE} />
+        ) : null}
+        <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+          <Text color={COLOR.gold} bold>
+            {'<Claude>'}
+          </Text>
+          <Markdown text={e.props.text} />
         </Box>
       </Box>
     )
@@ -812,20 +870,47 @@ export const register: Register = on => {
         titleRow = e.requestId
       }
     }
-    if (e.requestId !== titleRow) return next(e)
-    const { Box, Text } = $.ui.resolve(e)
+    const elements = $.ui.resolve(e)
+    const { Box, Text } = elements
+    const Raster = 'Raster' in elements ? elements.Raster : undefined
+    // The person's own prompt is a chat line under their name, beside their
+    // head; a row from anyone else keeps the engine's drawing
+    const row =
+      e.props.origin.kind === 'composer' ? (
+        <Box flexDirection="row" gap={1} marginTop={1}>
+          {sprites && 'Image' in elements ? (
+            <elements.Image source={{ file: sprites + 'head-player.png', format: 'png' }} columns={4} rows={2} alt=" " />
+          ) : Raster ? (
+            <Raster key="head" {...HEAD_PLAYER} />
+          ) : null}
+          <Box flexDirection="column" flexGrow={1} flexShrink={1}>
+            <Text color={COLOR.aqua} bold>
+              {'<' + player + '>'}
+            </Text>
+            <Text color={COLOR.white}>{e.props.text}</Text>
+          </Box>
+        </Box>
+      ) : (
+        await next(e)
+      )
+    if (e.requestId !== titleRow) return row
     const logo = logoRows('CLAUDECRAFT')
     return (
       <Box flexDirection="column">
-        <Text color={COLOR.white}>{logo[0]}</Text>
-        <Text color={COLOR.stone}>{logo[1]}</Text>
-        <Box flexDirection="row" gap={1} marginBottom={1}>
-          <Text color={COLOR.gray}>{logo[2]}</Text>
-          <Text color={COLOR.yellow} bold italic>
-            {splash}
-          </Text>
-        </Box>
-        {await next(e)}
+        {Raster ? (
+          <Raster key="title" {...TITLE} />
+        ) : (
+          <Box flexDirection="column">
+            <Text color={COLOR.white}>{logo[0]}</Text>
+            <Text color={COLOR.stone}>{logo[1]}</Text>
+            <Text color={COLOR.gray}>{logo[2]}</Text>
+          </Box>
+        )}
+        <Text color={COLOR.yellow} bold italic>
+          {splash}
+        </Text>
+        <Text color={COLOR.yellow}>{player + ' joined the game'}</Text>
+        {row}
       </Box>
     )
   })
@@ -841,20 +926,33 @@ export const register: Register = on => {
     )
   })
 
-  // Calls folded into one count line have no result rows, so the deaths among
-  // them are listed under the line
+  // A folded run of calls is drawn as chat lines too, the last four of them,
+  // with each death under its call; ctrl+o still unfolds the engine's rows
   on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
-    const dead = e.props.calls.filter(call => call.isErrored && !call.isInterrupted)
-    if (e.props.isExpanded || dead.length === 0) return next(e)
+    if (e.props.isExpanded) return next(e)
     const { Box, Text } = $.ui.resolve(e)
-    return (
-      <Box flexDirection="column">
-        {await next(e)}
-        {dead.map(call => (
-          <Text color={COLOR.red}>  ☠ {deathOf(call.tool_use_id ?? '', call.tool, call.input, call.output)}</Text>
-        ))}
-      </Box>
-    )
+    const shown = e.props.calls.slice(-4)
+    const earlier = e.props.calls.length - shown.length
+    const lines = []
+    if (earlier > 0) {
+      lines.push(
+        <Text color={COLOR.darkGray} italic>
+          {'[Claude: ' + earlier + ' earlier ' + (earlier === 1 ? 'action' : 'actions') + ', ctrl+o to see]'}
+        </Text>,
+      )
+    }
+    for (const call of shown) {
+      const isDead = call.isErrored && !call.isInterrupted
+      lines.push(
+        <Text color={call.isErrored ? COLOR.red : call.isRunning ? COLOR.white : COLOR.gray} italic wrap="truncate">
+          {'[Claude: ' + chatAction(call.tool, call.input, root) + (call.isInterrupted ? ' (interrupted)' : call.isRunning ? '…' : '') + ']'}
+        </Text>,
+      )
+      if (isDead) {
+        lines.push(<Text color={COLOR.red}>  ☠ {deathOf(call.tool_use_id ?? '', call.tool, call.input, call.output)}</Text>)
+      }
+    }
+    return <Box flexDirection="column">{lines}</Box>
   })
 
   // The advancements screen: the game's five tabs, one shown at a time, a
@@ -987,15 +1085,40 @@ export const register: Register = on => {
     const verifiedText = verifiedLine()
     const verifiedColor = unverifiedEdits >= 5 ? COLOR.gold : unverifiedEdits === 0 ? COLOR.green : COLOR.gray
 
+    // The hotbar: painted slots where the terminal has the cell grid and the
+    // band has four rows left for them, a line of glyphs otherwise
+    const elements = $.ui.resolve(e)
+    // A command that has run five seconds is a boss: its bar drains toward
+    // the command's timeout
+    const now = await clockNow($)
+    const boss = active.find(call => call.tool === 'Bash' && now - call.startedAt >= 5000)
+    // Rows already spoken for: the boss bar, the HUD and the line under it
+    const taken = (boss ? 2 : 0) + 3 + 1
+    const Raster = 'Raster' in elements && e.props.maxRows - taken >= 4 ? elements.Raster : undefined
+    const Sprite = sprites && 'Image' in elements && e.props.maxRows - taken >= 2 ? elements.Image : undefined
     const slots = []
     if (e.props.isWorking) {
       const running = active[active.length - 1]?.tool
       for (const [tool, uses] of [...hotbar].slice(-9)) {
         const isHeld = tool === running
         slots.push(
-          <Text color={isHeld ? COLOR.black : COLOR.stone} backgroundColor={isHeld ? COLOR.stone : COLOR.slot} bold={isHeld}>
-            {' ' + toolGlyph(tool) + ' ' + uses + ' '}
-          </Text>,
+          Sprite ? (
+            // The item in its slot, and the stack's count at its foot
+            <Box flexDirection="row">
+              <Sprite source={{ file: sprites + 'slot-' + itemOf(tool) + (isHeld ? '-held' : '') + '.png', format: 'png' }} columns={4} rows={2} alt={toolGlyph(tool)} />
+              <Box flexDirection="column" justifyContent="flex-end">
+                <Text color={isHeld ? COLOR.white : COLOR.gray} bold={isHeld}>
+                  {String(uses)}
+                </Text>
+              </Box>
+            </Box>
+          ) : Raster ? (
+            <Raster key={'slot-' + tool} {...slotPicture(tool, uses, isHeld)} />
+          ) : (
+            <Text color={isHeld ? COLOR.black : COLOR.stone} backgroundColor={isHeld ? COLOR.stone : COLOR.slot} bold={isHeld}>
+              {' ' + toolGlyph(tool) + ' ' + uses + ' '}
+            </Text>
+          ),
         )
       }
       for (const call of active.filter(one => one.tool === 'Agent').slice(0, 4)) {
@@ -1007,10 +1130,6 @@ export const register: Register = on => {
       }
     }
 
-    // A command that has run five seconds is a boss: its bar drains toward
-    // the command's timeout
-    const now = await clockNow($)
-    const boss = active.find(call => call.tool === 'Bash' && now - call.startedAt >= 5000)
     const top = []
     if (boss) {
       const elapsed = now - boss.startedAt
@@ -1032,18 +1151,105 @@ export const register: Register = on => {
           <Text color={COLOR.darkGray}>{left.empty}</Text>
         </Box>,
       )
-    } else if (!titleRow && e.props.maxRows >= 7 && e.props.bodyColumns >= 48) {
-      // Lit from above, like the stone letters of the game's title
-      const logo = logoRows('CLAUDECRAFT')
-      top.push(<Text color={COLOR.white}>{logo[0]}</Text>)
-      top.push(<Text color={COLOR.stone}>{logo[1]}</Text>)
+    } else if (!titleRow && e.props.maxRows >= 10 && e.props.bodyColumns >= 48) {
+      const Scene = 'Raster' in elements ? elements.Raster : undefined
+      if (Scene) top.push(<Scene key="title" {...TITLE} />)
       top.push(
-        <Box flexDirection="row" gap={1}>
-          <Text color={COLOR.gray}>{logo[2]}</Text>
-          <Text color={COLOR.yellow} bold italic>
-            {splash}
-          </Text>
-        </Box>,
+        <Text color={COLOR.yellow} bold italic>
+          {splash}
+        </Text>,
+      )
+    }
+
+    // The painted HUD where the terminal has the cell grid and the band is
+    // wide enough for it; the glyph one below otherwise
+    const foodLeft = hungerPercent === undefined ? undefined : Math.ceil(halves(100 - hungerPercent) / 2)
+    const picture = hudPicture({ health, isHurt, armor: worn?.points, food: foodLeft, level, into, cost })
+    const Hud = 'Raster' in elements && e.props.bodyColumns >= picture.columns && e.props.maxRows >= picture.rows + 1 ? elements.Raster : undefined
+    const notes = (
+      <Box flexDirection="column">
+        {worn ? <Text color={COLOR.darkGray}>{worn.points < 10 ? worn.parts : ' '}</Text> : null}
+        <Text color={COLOR.gold}>{used >= 80 ? 'low health · /compact' : ' '}</Text>
+        <Box flexDirection="row" gap={2}>
+          {verifiedText ? <Text color={verifiedColor}>{verifiedText}</Text> : null}
+          {deaths > 0 ? <Text color={COLOR.gray}>☠ {deaths}</Text> : null}
+        </Box>
+      </Box>
+    )
+    const Icon = sprites && 'Image' in elements && 'Raster' in elements && e.props.bodyColumns >= 42 ? elements.Image : undefined
+    if (Icon && 'Raster' in elements) {
+      // The game's own icons, two columns each: armor over hearts, food on
+      // the right, the experience bar under both
+      const Bar = elements.Raster
+      // Each carries a glyph as its alt, drawn if the terminal turns out not
+      // to show pictures after all
+      const ALTS: Record<string, string> = { heart: '♥', 'heart-half': '♥', 'heart-hurt': '♥', 'heart-empty': '♡', armor: '⛨', 'armor-empty': '·', food: '◆', 'food-empty': '·' }
+      const icon = (name: string) => <Icon source={{ file: sprites + name + '.png', format: 'png' }} columns={2} rows={1} alt={ALTS[name] ?? ' '} />
+      const heartRow = []
+      const plateRow = []
+      const foodRow = []
+      for (let i = 0; i < 10; i++) {
+        const left = health - i * 2
+        heartRow.push(icon(left <= 0 ? 'heart-empty' : isHurt ? 'heart-hurt' : left === 1 ? 'heart-half' : 'heart'))
+        if (worn) plateRow.push(icon(i < worn.points ? 'armor' : 'armor-empty'))
+        if (foodLeft !== undefined) foodRow.push(icon(i >= 10 - foodLeft ? 'food' : 'food-empty'))
+      }
+      const width = foodLeft === undefined ? 20 : 42
+      const isBeside = e.props.bodyColumns >= width + 3 + 38
+      const line = [worn && worn.points < 10 ? worn.parts : '', used >= 80 ? 'low health · /compact' : '', verifiedText ?? '', deaths > 0 ? '☠ ' + deaths : '']
+        .filter(Boolean)
+        .join('  ·  ')
+      return (
+        <Box flexDirection="column">
+          {top}
+          <Box flexDirection="row" gap={3}>
+            <Box flexDirection="column" width={width}>
+              {worn ? <Box flexDirection="row">{plateRow}</Box> : null}
+              <Box flexDirection="row" justifyContent="space-between">
+                <Box flexDirection="row">{heartRow}</Box>
+                <Box flexDirection="row">{foodRow}</Box>
+              </Box>
+              <Bar key="xp" {...xpPicture(width, level, into, cost)} />
+            </Box>
+            {isBeside ? notes : null}
+          </Box>
+          {!isBeside && line ? (
+            <Text color={COLOR.darkGray} wrap="truncate">
+              {line}
+            </Text>
+          ) : null}
+          {slots.length > 0 ? (
+            <Box flexDirection="row" gap={1}>
+              {slots}
+            </Box>
+          ) : null}
+        </Box>
+      )
+    }
+    if (Hud) {
+      // Beside the HUD where there is room, else one line under it
+      const isBeside = e.props.bodyColumns >= picture.columns + 3 + 38
+      const line = [worn && worn.points < 10 ? worn.parts : '', used >= 80 ? 'low health · /compact' : '', verifiedText ?? '', deaths > 0 ? '☠ ' + deaths : '']
+        .filter(Boolean)
+        .join('  ·  ')
+      return (
+        <Box flexDirection="column">
+          {top}
+          <Box flexDirection="row" gap={3}>
+            <Hud key="hud" {...picture} />
+            {isBeside ? notes : null}
+          </Box>
+          {!isBeside && line && e.props.maxRows >= picture.rows + 2 ? (
+            <Text color={COLOR.darkGray} wrap="truncate">
+              {line}
+            </Text>
+          ) : null}
+          {slots.length > 0 ? (
+            <Box flexDirection="row" gap={1}>
+              {slots}
+            </Box>
+          ) : null}
+        </Box>
       )
     }
 
@@ -1072,14 +1278,7 @@ export const register: Register = on => {
               </Box>
             </Box>
           </Box>
-          <Box flexDirection="column">
-            {worn ? <Text color={COLOR.darkGray}>{worn.points < 10 ? worn.parts : ' '}</Text> : null}
-            <Text color={COLOR.gold}>{used >= 80 ? 'low health · /compact' : ' '}</Text>
-            <Box flexDirection="row" gap={2}>
-              {verifiedText ? <Text color={verifiedColor}>{verifiedText}</Text> : null}
-              {deaths > 0 ? <Text color={COLOR.gray}>☠ {deaths}</Text> : null}
-            </Box>
-          </Box>
+          {notes}
         </Box>
         {slots.length > 0 ? (
           <Box flexDirection="row" gap={1}>
