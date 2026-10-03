@@ -1,6 +1,6 @@
 {
   "name": "codecraft",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "A Minecraft-inspired HUD for Claude Code: hearts for context, armor for safety nets, XP for verified work, and 60 advancements that persist across sessions",
   "author": { "name": "mkpvishnu" },
   "homepage": "https://github.com/mkpvishnu/claude-mods/tree/main/codecraft",

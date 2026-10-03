@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
-import { ADVANCEMENTS, advancementTree, type Advancement } from '../hooks/lore.ts'
+import { ADVANCEMENTS, advancementTree, logoRows, type Advancement } from '../hooks/lore.ts'
 
 // What a typed /inventory raises: the composer's own run, on a plain screen
 const INVENTORY = {
@@ -250,4 +250,8 @@ test('a tab is laid out as a tree, each advancement right of the one before it',
   expect(tree!.bands[1]!.filter(piece => 'id' in piece).length).toBe(6)
   // Seven icons deep does not fit 40 cells, so the screen falls back to cards
   expect(advancementTree('Story', visible, new Set(), '', 40)).toBeUndefined()
+})
+
+test('every letter of the title has a glyph in the block font', async () => {
+  for (const letter of 'CODECRAFT') expect(logoRows(letter).join('').trim()).not.toBe('')
 })
