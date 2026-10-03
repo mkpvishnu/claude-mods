@@ -1,0 +1,7 @@
+{
+  "name": "claudecraft",
+  "version": "0.1.0",
+  "description": "A Minecraft HUD for Claude Code: hearts for context, armor for safety nets, XP for verified work, and 60 advancements that persist across sessions",
+  "author": { "name": "mkpvishnu" },
+  "license": "MIT"
+}

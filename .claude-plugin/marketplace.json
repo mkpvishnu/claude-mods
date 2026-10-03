@@ -1,0 +1,12 @@
+{
+  "name": "claude-mods",
+  "description": "Mods for Claude Code",
+  "owner": { "name": "mkpvishnu" },
+  "plugins": [
+    {
+      "name": "claudecraft",
+      "source": "./claudecraft",
+      "description": "A Minecraft HUD for Claude Code: hearts for context, armor for safety nets, XP for verified work, and 60 advancements that persist across sessions"
+    }
+  ]
+}
