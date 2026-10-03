@@ -53,6 +53,16 @@ fi
 
 The mod sets `CLAUDECRAFT_STATUSLINE` in sessions where it is loaded. Without this step everything else still works and your status line stays as it is.
 
+## What it runs
+
+The mod makes no network requests and sends nothing anywhere. It does three things outside of drawing:
+
+- Runs read-only `git` commands in your working directory to find the repository root and whether work is committed and pushed. This feeds the armor bar.
+- Saves levels and advancements in the plugin's own store file under `~/.claude/plugins/store/`.
+- Sets the `CLAUDECRAFT_STATUSLINE` environment variable for the session, used by the status line step above.
+
+It watches tool calls to detect test runs, commits and failures, and never changes or blocks them.
+
 ## Develop
 
 ```
