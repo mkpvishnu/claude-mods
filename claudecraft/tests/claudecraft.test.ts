@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
+import { ADVANCEMENTS, advancementTree, type Advancement } from '../hooks/lore.ts'
 
 // What a typed /inventory raises: the composer's own run, on a plain screen
 const INVENTORY = {
@@ -234,4 +235,19 @@ test('a tool call is reported the way the game reports a command', async $ => {
   })
   expect(await ui.find({ type: 'Text', text: '[Claude: ran pytest -q]' })).toBeDefined()
   await ui.unmount()
+})
+
+test('a tab is laid out as a tree, each advancement right of the one before it', async () => {
+  const all = Object.values(ADVANCEMENTS) as Advancement[]
+  const visible = all.filter(one => !one.isHidden)
+  const tree = advancementTree('Minecraft', visible, new Set(['stoneAge']), 'upgrade', 80)
+  expect(tree).toBeDefined()
+  // The walk follows each branch out before the next one starts
+  expect(tree!.order.slice(0, 3)).toEqual(['stoneAge', 'upgrade', 'acquireHardware'])
+  expect(tree!.order).not.toContain('howDidWe')
+  // A margin row, then an icon row and a gap row for each of the five rows
+  expect(tree!.bands.length).toBe(11)
+  expect(tree!.bands[1]!.filter(piece => 'id' in piece).length).toBe(6)
+  // Seven icons deep does not fit 40 cells, so the screen falls back to cards
+  expect(advancementTree('Minecraft', visible, new Set(), '', 40)).toBeUndefined()
 })

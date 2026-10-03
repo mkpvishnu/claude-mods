@@ -29,7 +29,10 @@ import {
   chatAction,
   HEAD_CLAUDE,
   HEAD_PLAYER,
+  TAB_GROUND,
+  advancementTree,
   titleScene,
+  wrapText,
   slotPicture,
   hudPicture,
   itemOf,
@@ -111,6 +114,8 @@ const TITLE = titleScene('CLAUDECRAFT')
 // (kitty and Ghostty do); empty elsewhere, and the cell-grid art is drawn
 let sprites = ''
 let shownTab = 0
+// The advancement the screen's outline is on; '' picks the next one to earn
+let pickedAdvancement = ''
 // Tool calls running now, oldest first; the spinner names the newest
 const active: { id: string; tool: string; label: string; startedAt: number; timeoutMs: number }[] = []
 // Tools used this turn, in first-use order, with their counts
@@ -955,12 +960,15 @@ export const register: Register = on => {
     return <Box flexDirection="column">{lines}</Box>
   })
 
-  // The advancements screen: the game's five tabs, one shown at a time, a
-  // card for each advancement. An earned card is framed in gold (a challenge
-  // in purple, doubled), one still to earn in gray, and one whose parent is
-  // not earned yet stays locked
+  // The advancements screen: the game's five tabs, one shown at a time. Where
+  // the terminal shows images the tab is drawn as the game's tree: an icon for
+  // each advancement in a gold frame once earned, a stone one while open and
+  // a dark one while the advancement before it is not earned, lines joining
+  // them, and under the tree what the outlined one asks for. The pointer over
+  // an icon shows that one instead. Elsewhere each advancement is a card
   on('ui.render', { component: 'Pane', requestId: 'advancements' }, async ($, e) => {
-    const { Box, Text, Button } = $.ui.resolve(e)
+    const elements = $.ui.resolve(e)
+    const { Box, Text, Button } = elements
     const all = Object.values(ADVANCEMENTS) as Advancement[]
     const titles: Record<string, Advancement> = ADVANCEMENTS
     // 28 cells hold the longest title beside its icon, inside the frame
@@ -996,6 +1004,7 @@ export const register: Register = on => {
           plain
           onPress={() => {
             shownTab = index
+            pickedAdvancement = ''
             $.ui.invalidate('ui.render')
           }}
         >
@@ -1010,20 +1019,122 @@ export const register: Register = on => {
     )
 
     const tab = TABS[shownTab] ?? 'Minecraft'
+    const hidden = all.filter(one => one.tab === tab && one.isHidden && !earned.has(one.id)).length
+    const isLocked = (one: Advancement) => !earned.has(one.id) && one.after !== undefined && !earned.has(one.after)
+    if (sprites && 'Image' in elements && 'Raster' in elements) {
+      const { Image, Raster } = elements
+      const inTab = shown().filter(one => one.tab === tab)
+      const picked =
+        inTab.find(one => one.id === pickedAdvancement) ?? inTab.find(one => !earned.has(one.id) && !isLocked(one)) ?? inTab[0]
+      const tree = advancementTree(tab, inTab, earned, picked?.id ?? '', e.props.bodyColumns)
+      if (tree && picked) {
+        // The whole screen sits on the tab's ground, so the text and the gap
+        // around each icon read the same on a light theme as on a dark one
+        const backdrop = '#' + TAB_GROUND[tab].toString(16).padStart(6, '0')
+        const ground = tree.bands.map((band, row) => {
+          return (
+            <Box flexDirection="row">
+              {band.map((piece, index) => {
+                if ('picture' in piece) return <Raster key={'ground-' + row + '-' + index} {...piece.picture} />
+                const one = titles[piece.id]!
+                const state = earned.has(one.id) ? 'earned' : isLocked(one) ? 'locked' : 'open'
+                return (
+                  <Box key={'node-' + one.id} width={4} height={2} backgroundColor={backdrop} hover={{ scope: 'advancement-' + one.id }}>
+                    <Image source={{ file: sprites + 'adv-' + one.id + '-' + state + '.png', format: 'png' }} columns={4} rows={2} alt={one.icon} />
+                  </Box>
+                )
+              })}
+            </Box>
+          )
+        })
+
+        // What one advancement asks for, every line as wide as the body so a
+        // card shown over another hides it. It sits over the tree, where it
+        // stays in view while a tall tree scrolls
+        const width = e.props.bodyColumns
+        const lines = width >= 66 ? 2 : 3
+        const card = (one: Advancement) => {
+          const isEarned = earned.has(one.id)
+          const parent = one.after ? titles[one.after] : undefined
+          const lit = one.frame === 'challenge' ? COLOR.purple : COLOR.gold
+          const kind = one.frame === 'task' ? '' : one.frame === 'goal' ? 'Goal' : 'Challenge'
+          const state = isEarned ? '✔ Made' : isLocked(one) && parent ? 'After ' + parent.title : 'Open'
+          const facts = [kind, one.xp ? '+' + one.xp + ' XP' : '', state].filter(Boolean).join(' · ')
+          const how = wrapText(one.how, width).slice(0, lines)
+          return [
+            <Box flexDirection="row" width={width}>
+              <Text color={isEarned ? lit : isLocked(one) ? COLOR.stone : COLOR.white} bold wrap="truncate">
+                {one.title}
+              </Text>
+              <Text color={isEarned ? COLOR.green : COLOR.gray} wrap="truncate">
+                {('  ' + facts).padEnd(Math.max(0, width - one.title.length))}
+              </Text>
+            </Box>,
+            ...Array.from({ length: lines }, (_, line) => (
+              <Text color={COLOR.gray} wrap="truncate">
+                {(how[line] ?? '').padEnd(width)}
+              </Text>
+            )),
+          ]
+        }
+        const step = (by: number) => () => {
+          const at = tree.order.indexOf(picked.id)
+          pickedAdvancement = tree.order[(at + by + tree.order.length) % tree.order.length] ?? ''
+          $.ui.invalidate('ui.render')
+        }
+        return (
+          <Box flexDirection="column" width={width} backgroundColor={backdrop}>
+            <Box flexDirection="row" flexWrap="wrap" columnGap={1}>
+              {tabs}
+            </Box>
+            <Box flexDirection="column" height={lines + 1} marginTop={1}>
+            {card(picked)}
+            {tree.order
+              .filter(id => id !== picked.id)
+              .map(id => (
+                <Box
+                  position="absolute"
+                  top={0}
+                  left={0}
+                  flexDirection="column"
+                  backgroundColor={backdrop}
+                  display="none"
+                  hover={{ scope: 'advancement-' + id, display: 'flex' }}
+                >
+                  {card(titles[id]!)}
+                </Box>
+              ))}
+            </Box>
+            <Box flexDirection="row" columnGap={1}>
+              <Button key="previous" hotkey="p" plain onPress={step(-1)}>
+                Previous
+              </Button>
+              <Button key="next" hotkey="n" plain onPress={step(1)}>
+                Next
+              </Button>
+              <Text color={COLOR.gray} wrap="truncate">
+                {'· ' + earned.size + '/' + all.length + ' made' + (hidden > 0 ? ' · ' + hidden + ' hidden in this tab' : '')}
+              </Text>
+            </Box>
+            {ground}
+          </Box>
+        )
+      }
+    }
+
     const cards = []
     for (const advancement of shown().filter(one => one.tab === tab)) {
       const isEarned = earned.has(advancement.id)
       const parent = advancement.after ? titles[advancement.after] : undefined
-      const isLocked = !isEarned && parent !== undefined && !earned.has(parent.id)
       const lit = advancement.frame === 'challenge' ? COLOR.purple : COLOR.gold
       const frame = advancement.frame === 'challenge' ? 'double' : advancement.frame === 'goal' ? 'round' : 'single'
       cards.push(
         <Box flexDirection="column" width={cardWidth} borderStyle={frame} borderColor={isEarned ? lit : COLOR.darkGray}>
-          <Text color={isEarned ? lit : isLocked ? COLOR.darkGray : COLOR.stone} bold={isEarned} wrap="truncate">
-            {isLocked ? '🔒' : advancement.icon} {advancement.title}
+          <Text color={isEarned ? lit : isLocked(advancement) ? COLOR.darkGray : COLOR.stone} bold={isEarned} wrap="truncate">
+            {isLocked(advancement) ? '🔒' : advancement.icon} {advancement.title}
           </Text>
           <Text color={isEarned ? COLOR.white : COLOR.darkGray}>
-            {isLocked && parent ? 'After ' + parent.title : advancement.how}
+            {isLocked(advancement) && parent ? 'After ' + parent.title : advancement.how}
           </Text>
         </Box>,
       )
@@ -1033,7 +1144,6 @@ export const register: Register = on => {
         {cards}
       </Box>,
     )
-    const hidden = all.filter(one => one.tab === tab && one.isHidden && !earned.has(one.id)).length
     if (hidden > 0) {
       rows.push(
         <Text color={COLOR.darkGray} italic>

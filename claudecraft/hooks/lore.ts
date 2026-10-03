@@ -640,3 +640,180 @@ export function titleScene(word: string): Picture {
   }
   return paint(pixels)
 }
+
+// The ground each tab's tree is drawn on: stone, netherrack, end stone, grass
+// and farmland, kept dark so the icons stand out. tools/sprites.py fills the
+// corners of each icon with the same color
+export const TAB_GROUND: Record<Tab, number> = {
+  Minecraft: 0x2e2e32,
+  Nether: 0x341416,
+  'The End': 0x32301e,
+  Adventure: 0x1e3020,
+  Husbandry: 0x33261a,
+}
+
+// Breaks text into lines of at most `width` cells, at spaces
+export function wrapText(text: string, width: number): string[] {
+  const lines: string[] = []
+  let line = ''
+  for (const word of text.split(' ')) {
+    if (line && line.length + 1 + word.length > width) {
+      lines.push(line)
+      line = word
+    } else {
+      line = line ? line + ' ' + word : word
+    }
+  }
+  if (line) lines.push(line)
+  return lines
+}
+
+// One piece of a row of the tree: a stretch of ground and lines, or the icon
+// of an advancement
+export type TreePiece = { picture: Picture } | { id: string }
+
+export type Tree = { columns: number; order: string[]; bands: TreePiece[][] }
+
+const NODE_COLUMNS = 4
+const NODE_PITCH = 8
+const ROW_PITCH = 3
+const EDGE = 2
+
+function shade(color: number, by: number): number {
+  const part = (shift: number) => Math.max(0, Math.min(255, ((color >> shift) & 255) + by)) << shift
+  return part(16) | part(8) | part(0)
+}
+
+// Lays a tab's advancements out as the game does: each one to the right of
+// the one it comes after, siblings stacked, lines joining them. Trees with
+// separate roots sit side by side while they fit in `maxColumns`, else in one
+// stack; undefined when even that is too wide. The selected one gets white
+// brackets. `order` is the walk the next and previous keys follow
+export function advancementTree(
+  tab: Tab,
+  visible: Advancement[],
+  earned: ReadonlySet<string>,
+  selected: string,
+  maxColumns: number,
+): Tree | undefined {
+  const mine = visible.filter(one => one.tab === tab)
+  const ids = new Set(mine.map(one => one.id))
+  const roots = mine.filter(one => !one.after || !ids.has(one.after))
+  const childrenOf = (id: string) => mine.filter(one => one.after === id)
+
+  // Each root's tree as a block of its own, in node columns and node rows
+  type Placed = { id: string; x: number; y: number; parent?: Placed }
+  const blocks = roots.map(root => {
+    const nodes: Placed[] = []
+    const place = (one: Advancement, x: number, top: number, parent?: Placed): number => {
+      const node: Placed = { id: one.id, x, y: top, parent }
+      nodes.push(node)
+      let height = 0
+      for (const child of childrenOf(one.id)) height += place(child, x + 1, top + height, node)
+      return Math.max(1, height)
+    }
+    const height = place(root, 0, 0)
+    return { nodes, height, width: Math.max(...nodes.map(node => node.x)) + 1 }
+  })
+  if (blocks.length === 0) return undefined
+
+  const pack = (limit: number) => {
+    const placed: Placed[] = []
+    let left = 0
+    let top = 0
+    let wide = 0
+    let rows = 0
+    for (const block of blocks) {
+      if (top > 0 && top + block.height > limit) {
+        left += wide
+        top = 0
+        wide = 0
+      }
+      for (const node of block.nodes) {
+        node.x += left
+        node.y += top
+        placed.push(node)
+      }
+      top += block.height
+      wide = Math.max(wide, block.width)
+      rows = Math.max(rows, top)
+    }
+    return { placed, rows, columns: (left + wide) * NODE_PITCH - (NODE_PITCH - NODE_COLUMNS) + EDGE * 2 }
+  }
+  // Remember where each node sits inside its block, to pack twice
+  const home = new Map(blocks.flatMap(block => block.nodes.map(node => [node, { x: node.x, y: node.y }] as const)))
+  let packed = pack(Math.max(4, ...blocks.map(block => block.height)))
+  if (packed.columns > maxColumns) {
+    for (const [node, at] of home) Object.assign(node, at)
+    packed = pack(Infinity)
+  }
+  if (packed.columns > maxColumns) return undefined
+
+  // The ground, then the lines, then the outline of the selected one
+  // The ground runs the width of the screen, as the game's window does
+  const { placed } = packed
+  const columns = Math.max(packed.columns, Math.min(maxColumns, 120))
+  const rows = 1 + packed.rows * ROW_PITCH
+  const ground = TAB_GROUND[tab]
+  const pixels: number[][] = Array.from({ length: rows * 2 }, (_, y) =>
+    Array.from({ length: columns }, (_, x) => {
+      const speck = ((x * 73856093) ^ (y * 19349663)) >>> 0
+      return speck % 9 === 0 ? shade(ground, 10) : speck % 7 === 0 ? shade(ground, -8) : ground
+    }),
+  )
+  const fill = (x0: number, x1: number, y0: number, y1: number, color: number) => {
+    for (let y = Math.max(0, y0); y <= y1 && y < pixels.length; y++) {
+      for (let x = Math.max(0, x0); x <= x1 && x < columns; x++) pixels[y]![x] = color
+    }
+  }
+  const leftOf = (node: Placed) => EDGE + node.x * NODE_PITCH
+  const topOf = (node: Placed) => (1 + node.y * ROW_PITCH) * 2
+  const joined = placed.filter(node => node.parent)
+  // Lit lines go on last, so a shared trunk shows the earned path
+  for (const isLit of [false, true]) {
+    for (const node of joined) {
+      if (earned.has(node.id) !== isLit) continue
+      const color = isLit ? 0xffffff : 0x6f6f6f
+      const from = leftOf(node.parent!) + NODE_COLUMNS
+      const out = topOf(node.parent!) + 1
+      const into = topOf(node) + 1
+      fill(from, from + 2, out, out + 1, color)
+      fill(from + 1, from + 2, out, into + 1, color)
+      fill(from + 1, from + 3, into, into + 1, color)
+    }
+  }
+  const picked = placed.find(node => node.id === selected)
+  if (picked) {
+    const x = leftOf(picked)
+    const y = topOf(picked)
+    // A bracket at each corner, clear of where the lines meet the icon
+    const right = x + NODE_COLUMNS
+    for (const [edge, inner] of [
+      [y - 1, y],
+      [y + 4, y + 3],
+    ] as const) {
+      fill(x - 1, x, edge, edge, 0xffffff)
+      fill(right - 1, right, edge, edge, 0xffffff)
+      fill(x - 1, x - 1, Math.min(edge, inner), Math.max(edge, inner), 0xffffff)
+      fill(right, right, Math.min(edge, inner), Math.max(edge, inner), 0xffffff)
+    }
+  }
+
+  // Cut into rows of pieces: icons where the nodes are, ground between
+  const cut = (x0: number, x1: number, row: number, tall: number): TreePiece => ({
+    picture: paint(pixels.slice(row * 2, (row + tall) * 2).map(line => line.slice(x0, x1))),
+  })
+  const bands: TreePiece[][] = [[cut(0, columns, 0, 1)]]
+  for (let y = 0; y < packed.rows; y++) {
+    const row = 1 + y * ROW_PITCH
+    const band: TreePiece[] = []
+    let at = 0
+    for (const node of placed.filter(one => one.y === y).sort((a, b) => a.x - b.x)) {
+      band.push(cut(at, leftOf(node), row, 2), { id: node.id })
+      at = leftOf(node) + NODE_COLUMNS
+    }
+    band.push(cut(at, columns, row, 2))
+    bands.push(band, [cut(0, columns, row + 2, 1)])
+  }
+  return { columns, order: placed.map(node => node.id), bands }
+}
