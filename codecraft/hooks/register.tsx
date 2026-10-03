@@ -109,7 +109,7 @@ let isTicking = false
 let splash = ''
 // The name chat lines carry for the person at the prompt
 let player = 'Steve'
-const TITLE = titleScene('CLAUDECRAFT')
+const TITLE = titleScene('CODECRAFT')
 // Where the sprite files are, once the terminal is known to show pictures
 // (kitty and Ghostty do); empty elsewhere, and the cell-grid art is drawn
 let sprites = ''
@@ -467,7 +467,7 @@ export const register: Register = on => {
     })
     // The status line script takes over the line in sessions where this mod
     // is loaded: the user's own script hands over when it sees the variable
-    await $.env.set('CLAUDECRAFT_STATUSLINE', $.plugin.root + '/scripts/statusline.sh')
+    await $.env.set('CODECRAFT_STATUSLINE', $.plugin.root + '/scripts/statusline.sh')
     await save($)
     // The band may have drawn before the figures above arrived
     $.ui.invalidate('ui.render')
@@ -899,7 +899,7 @@ export const register: Register = on => {
         await next(e)
       )
     if (e.requestId !== titleRow) return row
-    const logo = logoRows('CLAUDECRAFT')
+    const logo = logoRows('CODECRAFT')
     return (
       <Box flexDirection="column">
         {Raster ? (
@@ -1018,7 +1018,7 @@ export const register: Register = on => {
       </Box>,
     )
 
-    const tab = TABS[shownTab] ?? 'Minecraft'
+    const tab = TABS[shownTab] ?? 'Story'
     const hidden = all.filter(one => one.tab === tab && one.isHidden && !earned.has(one.id)).length
     const isLocked = (one: Advancement) => !earned.has(one.id) && one.after !== undefined && !earned.has(one.after)
     if (sprites && 'Image' in elements && 'Raster' in elements) {

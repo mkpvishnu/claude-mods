@@ -1,5 +1,5 @@
 #!/bin/bash
-# The status line for sessions with the claudecraft mod loaded. The band
+# The status line for sessions with the codecraft mod loaded. The band
 # above the prompt is the HUD, read at a glance; this line is the debug screen
 # under it: where you are and the exact figures behind the hearts and the food.
 

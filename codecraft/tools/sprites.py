@@ -771,7 +771,7 @@ LORE = open(os.path.join(os.path.dirname(__file__), '..', 'hooks', 'lore.ts')).r
 FRAMES = re.findall(r'id: "(\w+)",[^\n]*?tab: "([^"]+)", frame: "(\w+)"', LORE)
 # The ground of each tab's tree, as TAB_GROUND in hooks/lore.ts has it: an
 # icon's corners are filled with it, so no gap shows around the frame
-GROUND = {'Minecraft': 0x2e2e32, 'Nether': 0x341416, 'The End': 0x32301e, 'Adventure': 0x1e3020, 'Husbandry': 0x33261a}
+GROUND = {'Story': 0x2e2e32, 'Nether': 0x341416, 'The End': 0x32301e, 'Adventure': 0x1e3020, 'Husbandry': 0x33261a}
 for advancement, tab, kind in FRAMES:
     art, palette = ICONS[ADVANCEMENT_ICONS[advancement]]
     for row in art:

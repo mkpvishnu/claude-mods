@@ -1,0 +1,4 @@
+{
+  "description": "The codecraft hooks module",
+  "modules": ["./register.tsx"]
+}

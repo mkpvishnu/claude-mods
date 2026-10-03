@@ -1,4 +1,0 @@
-{
-  "description": "The claudecraft hooks module",
-  "modules": ["./register.tsx"]
-}

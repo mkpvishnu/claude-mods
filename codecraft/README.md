@@ -1,10 +1,10 @@
-# claudecraft
+# CodeCraft
 
-A Minecraft HUD for Claude Code. The hearts are your context window, the armor is how safe your work is, the XP bar fills only for verified work, and the conversation reads like in-game chat. Each piece of the screen shows something real about the session, so you can read the state of your work the way you read a game screen.
+A Minecraft-inspired HUD for Claude Code. The hearts are your context window, the armor is how safe your work is, the XP bar fills only for verified work, and the conversation reads like in-game chat. Each piece of the screen shows something real about the session, so you can read the state of your work the way you read a game screen.
 
 ![The HUD icons, hotbar items, player heads and advancement icons](../docs/sprites.png)
 
-Not affiliated with Mojang or Microsoft.
+Not an official Minecraft product. Not approved by or associated with Mojang or Microsoft.
 
 ## Install
 
@@ -12,7 +12,7 @@ You need Claude Code 2.1.288 or later. In Claude Code, run:
 
 ```
 /plugin marketplace add mkpvishnu/claude-mods
-/plugin install claudecraft@claude-mods
+/plugin install codecraft@claude-mods
 ```
 
 Start a new session and the HUD appears above the prompt. Nothing else is needed. The status line is an optional extra, described [below](#status-line).
@@ -47,9 +47,9 @@ Each kind of tool has its own item in the hotbar:
 
 ## The chat
 
-The conversation reads like a Minecraft server chat:
+The conversation reads like a game server's chat:
 
-- The CLAUDECRAFT title, in stone letters on a strip of grass, sits above your first prompt, with a splash line and `<you> joined the game`.
+- The CODECRAFT title, in stone letters on a strip of grass, sits above your first prompt, with a splash line and `<you> joined the game`.
 - Your prompts appear under `<your name>` beside the player's head, and replies under `<Claude>` beside Claude's block head.
 - Tool calls are short gray lines such as `[Claude: ran pytest -q]` or `[Claude: edited src/app.py]`. A failed call turns red and gets a death message.
 - Skill and MCP tool lines carry an enchantment mark (✦).
@@ -58,11 +58,11 @@ The conversation reads like a Minecraft server chat:
 
 ## Advancements
 
-There are 60 advancements across the game's five tabs, earned by real work and saved across sessions. Six are hidden until you earn them.
+There are 60 advancements across five tabs modelled on the game's, earned by real work and saved across sessions. Six are hidden until you earn them.
 
 | Tab | What it covers | Examples |
 |---|---|---|
-| Minecraft | Building and verifying | Stone Age (edit a file), Diamonds! (commit with the tests green), A Furious Cocktail (tests, checks and build all green) |
+| Story | Building and verifying | Stone Age (edit a file), Diamonds! (commit with the tests green), A Furious Cocktail (tests, checks and build all green) |
 | Nether | Subagents and git history | We Need to Go Deeper (send out a subagent), Hidden in the Depths (find a bad commit with git bisect) |
 | The End | Pull requests and releases | The End? (open a pull request), Free the End (merge one), The City at the End of the Game (cut a release) |
 | Adventure | Testing and exploring | Monster Hunter (turn a red test run green), Bullseye (green on the first run 10 times in a row), Is It a Bird? (search the web) |
@@ -70,7 +70,7 @@ There are 60 advancements across the game's five tabs, earned by real work and s
 
 Run `/advancements` to open the advancements screen. Each tab is drawn as the game's tree, with every advancement joined by a line to the one it comes after:
 
-![The Minecraft and Adventure tabs of the advancements screen](../docs/advancements.png)
+![The Story and Adventure tabs of the advancements screen](../docs/advancements.png)
 
 - **Frame colour:** gold means earned, stone means open, and dark means locked until the advancement before it is earned.
 - **Frame shape:** square for a task, rounded for a goal, spiked for a challenge. Challenges also give bonus XP.
@@ -89,13 +89,13 @@ The mod ships a status line (`scripts/statusline.sh`, needs `jq`) showing the di
 A mod cannot replace your status line by itself, so your own status line script has to hand over to it. Put this at the top of your script, right after it reads its input into `$input`:
 
 ```bash
-if [ -n "$CLAUDECRAFT_STATUSLINE" ] && [ -x "$CLAUDECRAFT_STATUSLINE" ]; then
-    printf '%s' "$input" | "$CLAUDECRAFT_STATUSLINE"
+if [ -n "$CODECRAFT_STATUSLINE" ] && [ -x "$CODECRAFT_STATUSLINE" ]; then
+    printf '%s' "$input" | "$CODECRAFT_STATUSLINE"
     exit
 fi
 ```
 
-The mod sets `CLAUDECRAFT_STATUSLINE` only in sessions where it is loaded, so your own status line comes back when the mod is off. Without this step everything else still works.
+The mod sets `CODECRAFT_STATUSLINE` only in sessions where it is loaded, so your own status line comes back when the mod is off. Without this step everything else still works.
 
 ## Privacy and what it runs
 
@@ -104,7 +104,7 @@ The mod makes no network requests and sends nothing anywhere. It never changes o
 - Runs read-only `git` commands in your working directory to find the repository root and whether your work is committed and pushed. This feeds the armor bar.
 - Saves your levels and advancements in the plugin's own store file under `~/.claude/plugins/store/`.
 - Reads the `USER` environment variable for the name on your chat lines, and `TERM`, `TERM_PROGRAM` and `KITTY_WINDOW_ID` to tell whether the terminal can show images.
-- Sets the `CLAUDECRAFT_STATUSLINE` environment variable for the session, used by the status line step above.
+- Sets the `CODECRAFT_STATUSLINE` environment variable for the session, used by the status line step above.
 
 ## Develop
 
@@ -113,15 +113,15 @@ Clone the repository and run Claude Code with the mod loaded from your checkout.
 ```
 git clone https://github.com/mkpvishnu/claude-mods
 cd claude-mods
-claude --plugin-dir ./claudecraft
+claude --plugin-dir ./codecraft
 ```
 
 | Task | Command |
 |---|---|
-| Type check | `npx -p typescript@5 tsc -p claudecraft` |
-| Validate the plugin | `claude plugin validate --strict ./claudecraft` |
-| Run the tests | `cd claudecraft && claude plugin test` |
-| Redraw the sprites | `python3 claudecraft/tools/sprites.py` (needs Pillow) |
+| Type check | `npx -p typescript@5 tsc -p codecraft` |
+| Validate the plugin | `claude plugin validate --strict ./codecraft` |
+| Run the tests | `cd codecraft && claude plugin test` |
+| Redraw the sprites | `python3 codecraft/tools/sprites.py` (needs Pillow) |
 
 The code is in `hooks/`: `register.tsx` holds the hooks and the drawing, and `lore.ts` holds the pure helpers such as the advancement list, levels, chat wording and the advancement tree layout. The sprites in `assets/` are generated from the letter art in `tools/sprites.py`, so edit that file and rerun it to change one.
 

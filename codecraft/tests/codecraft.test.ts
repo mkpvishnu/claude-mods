@@ -93,7 +93,7 @@ test('a failed call draws a death message over its error', async ($, on) => {
   })
 
   const ui = await $.ui.mount({
-    plugin: 'claudecraft',
+    plugin: 'codecraft',
     surface: 'terminal',
     component: 'ToolResult',
     requestId: 'toolu_1',
@@ -107,7 +107,7 @@ test('a failed call draws a death message over its error', async ($, on) => {
 test('a folded group draws each call as a chat line, with a death under the failed one', async $ => {
   const call = { isRunning: false, isInterrupted: false, tool: 'Bash' }
   const ui = await $.ui.mount({
-    plugin: 'claudecraft',
+    plugin: 'codecraft',
     surface: 'terminal',
     component: 'ToolGroup',
     props: {
@@ -126,12 +126,12 @@ test('a folded group draws each call as a chat line, with a death under the fail
 })
 
 test('the band paints the title and the HUD, and falls back to glyphs where it is narrow', async $ => {
-  const ui = await $.ui.mount({ plugin: 'claudecraft', surface: 'terminal', component: 'AbovePrompt', props: BAND })
+  const ui = await $.ui.mount({ plugin: 'codecraft', surface: 'terminal', component: 'AbovePrompt', props: BAND })
   expect(await ui.find({ type: 'Raster' })).toBeDefined()
   await ui.unmount()
 
   const narrow = await $.ui.mount({
-    plugin: 'claudecraft',
+    plugin: 'codecraft',
     surface: 'terminal',
     component: 'AbovePrompt',
     props: { ...BAND, bodyColumns: 30 },
@@ -147,7 +147,7 @@ test('the advancements screen lights the earned cards and locks the ones behind 
   await $.tool.call({ tool: 'Write', file_path: '/tmp/house.py', content: 'door = 1' })
 
   const ui = await $.ui.mount({
-    plugin: 'claudecraft',
+    plugin: 'codecraft',
     surface: 'terminal',
     component: 'Pane',
     requestId: 'advancements',
@@ -160,7 +160,7 @@ test('the advancements screen lights the earned cards and locks the ones behind 
       view: {},
     },
   })
-  expect(await ui.find({ type: 'Text', text: ' Minecraft 1 ' })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: ' Story 1 ' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '1/60' })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: '🧱 Stone Age' })).toBeDefined()
   // Its parent is earned, so the test card is open; the one after it is not
@@ -203,7 +203,7 @@ test('a commit after a green run is a verified one, and every check green makes 
 
 test('a prompt and a reply are chat lines under their names', async $ => {
   const prompt = await $.ui.mount({
-    plugin: 'claudecraft',
+    plugin: 'codecraft',
     surface: 'terminal',
     component: 'UserMessage',
     requestId: 'row_1',
@@ -215,7 +215,7 @@ test('a prompt and a reply are chat lines under their names', async $ => {
   await prompt.unmount()
 
   const reply = await $.ui.mount({
-    plugin: 'claudecraft',
+    plugin: 'codecraft',
     surface: 'terminal',
     component: 'AssistantMessage',
     props: { text: 'The house is built.', isFirstOfReply: true },
@@ -227,7 +227,7 @@ test('a prompt and a reply are chat lines under their names', async $ => {
 
 test('a tool call is reported the way the game reports a command', async $ => {
   const ui = await $.ui.mount({
-    plugin: 'claudecraft',
+    plugin: 'codecraft',
     surface: 'terminal',
     component: 'ToolUse',
     requestId: 'toolu_1',
@@ -240,7 +240,7 @@ test('a tool call is reported the way the game reports a command', async $ => {
 test('a tab is laid out as a tree, each advancement right of the one before it', async () => {
   const all = Object.values(ADVANCEMENTS) as Advancement[]
   const visible = all.filter(one => !one.isHidden)
-  const tree = advancementTree('Minecraft', visible, new Set(['stoneAge']), 'upgrade', 80)
+  const tree = advancementTree('Story', visible, new Set(['stoneAge']), 'upgrade', 80)
   expect(tree).toBeDefined()
   // The walk follows each branch out before the next one starts
   expect(tree!.order.slice(0, 3)).toEqual(['stoneAge', 'upgrade', 'acquireHardware'])
@@ -249,5 +249,5 @@ test('a tab is laid out as a tree, each advancement right of the one before it',
   expect(tree!.bands.length).toBe(11)
   expect(tree!.bands[1]!.filter(piece => 'id' in piece).length).toBe(6)
   // Seven icons deep does not fit 40 cells, so the screen falls back to cards
-  expect(advancementTree('Minecraft', visible, new Set(), '', 40)).toBeUndefined()
+  expect(advancementTree('Story', visible, new Set(), '', 40)).toBeUndefined()
 })

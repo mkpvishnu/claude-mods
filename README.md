@@ -4,9 +4,9 @@ Mods for [Claude Code](https://claude.com/claude-code), installable as a plugin 
 
 | Mod | What it does |
 |---|---|
-| [claudecraft](claudecraft/README.md) | A Minecraft HUD for Claude Code: hearts for context, armor for safety nets, XP for verified work, in-game chat, and 60 advancements that persist across sessions. |
+| [CodeCraft](codecraft/README.md) | A Minecraft-inspired HUD for Claude Code: hearts for context, armor for safety nets, XP for verified work, in-game chat, and 60 advancements that persist across sessions. |
 
-![claudecraft's HUD icons, hotbar items and advancement icons](docs/sprites.png)
+![CodeCraft's HUD icons, hotbar items and advancement icons](docs/sprites.png)
 
 ## Install
 
@@ -14,7 +14,7 @@ You need Claude Code 2.1.288 or later. In Claude Code, add this marketplace once
 
 ```
 /plugin marketplace add mkpvishnu/claude-mods
-/plugin install claudecraft@claude-mods
+/plugin install codecraft@claude-mods
 ```
 
 To get updates later, run `/plugin marketplace update claude-mods`.
@@ -26,3 +26,5 @@ Issues and pull requests are welcome. Each mod's README has a Develop section wi
 ## License
 
 [MIT](LICENSE)
+
+CodeCraft is not an official Minecraft product. It is not approved by or associated with Mojang or Microsoft.

@@ -170,7 +170,7 @@ export function isTestCommand(command: string): boolean {
   )
 }
 
-export type Tab = 'Minecraft' | 'Nether' | 'The End' | 'Adventure' | 'Husbandry'
+export type Tab = 'Story' | 'Nether' | 'The End' | 'Adventure' | 'Husbandry'
 
 // The game's three frames: a task is a step, a goal a milestone, a challenge
 // one of the hard ones. `after` names the advancement this one hangs under on
@@ -189,22 +189,22 @@ export type Advancement = {
 }
 
 export const ADVANCEMENTS = {
-  stoneAge: { id: "stoneAge", title: "Stone Age", how: "Edit a file", icon: "🧱", tab: "Minecraft", frame: "task" },
-  upgrade: { id: "upgrade", title: "Getting an Upgrade", how: "Get a green test run", icon: "🔰", tab: "Minecraft", frame: "task", after: "stoneAge" },
-  acquireHardware: { id: "acquireHardware", title: "Acquire Hardware", how: "Get a build to succeed", icon: "🔩", tab: "Minecraft", frame: "task", after: "upgrade" },
-  suitUp: { id: "suitUp", title: "Suit Up", how: "Pass a linter or a type checker", icon: "🦺", tab: "Minecraft", frame: "task", after: "acquireHardware" },
-  notToday: { id: "notToday", title: "Not Today, Thank You", how: "Clear a problem a linter or type checker caught", icon: "🧿", tab: "Minecraft", frame: "task", after: "suitUp" },
-  furiousCocktail: { id: "furiousCocktail", title: "A Furious Cocktail", how: "Have tests, checks and the build all green since the last edit", icon: "🧪", tab: "Minecraft", frame: "challenge", after: "notToday", xp: 30 },
-  howDidWe: { id: "howDidWe", title: "How Did We Get Here?", how: "In one session: every check green, a verified commit, a push, a pull request, a subagent, a web lookup and a skill or MCP call", icon: "🌀", tab: "Minecraft", frame: "challenge", after: "furiousCocktail", isHidden: true, xp: 100 },
-  ironPick: { id: "ironPick", title: "Isn't It Iron Pick", how: "Make a git commit", icon: "🪓", tab: "Minecraft", frame: "task", after: "acquireHardware" },
-  diamonds: { id: "diamonds", title: "Diamonds!", how: "Commit with the tests green and nothing edited since", icon: "💎", tab: "Minecraft", frame: "task", after: "ironPick" },
-  coverMe: { id: "coverMe", title: "Cover Me with Diamonds", how: "Make 25 verified commits", icon: "👑", tab: "Minecraft", frame: "goal", after: "diamonds", xp: 15 },
-  coverMeInDebris: { id: "coverMeInDebris", title: "Cover Me in Debris", how: "Make 250 verified commits", icon: "🌑", tab: "Minecraft", frame: "challenge", after: "coverMe", xp: 100 },
-  enchanter: { id: "enchanter", title: "Enchanter", how: "Use a skill", icon: "📕", tab: "Minecraft", frame: "task", after: "diamonds" },
-  hotStuff: { id: "hotStuff", title: "Hot Stuff", how: "Push your commits", icon: "🔥", tab: "Minecraft", frame: "task", after: "ironPick" },
-  iceBucket: { id: "iceBucket", title: "Ice Bucket Challenge", how: "Resolve a merge conflict", icon: "🧊", tab: "Minecraft", frame: "task", after: "hotStuff" },
-  eyeSpy: { id: "eyeSpy", title: "Eye Spy", how: "Start a new branch", icon: "👀", tab: "Minecraft", frame: "task", after: "iceBucket" },
-  zombieDoctor: { id: "zombieDoctor", title: "Zombie Doctor", how: "Get a broken tool working again", icon: "💉", tab: "Minecraft", frame: "goal", after: "stoneAge", xp: 15 },
+  stoneAge: { id: "stoneAge", title: "Stone Age", how: "Edit a file", icon: "🧱", tab: "Story", frame: "task" },
+  upgrade: { id: "upgrade", title: "Getting an Upgrade", how: "Get a green test run", icon: "🔰", tab: "Story", frame: "task", after: "stoneAge" },
+  acquireHardware: { id: "acquireHardware", title: "Acquire Hardware", how: "Get a build to succeed", icon: "🔩", tab: "Story", frame: "task", after: "upgrade" },
+  suitUp: { id: "suitUp", title: "Suit Up", how: "Pass a linter or a type checker", icon: "🦺", tab: "Story", frame: "task", after: "acquireHardware" },
+  notToday: { id: "notToday", title: "Not Today, Thank You", how: "Clear a problem a linter or type checker caught", icon: "🧿", tab: "Story", frame: "task", after: "suitUp" },
+  furiousCocktail: { id: "furiousCocktail", title: "A Furious Cocktail", how: "Have tests, checks and the build all green since the last edit", icon: "🧪", tab: "Story", frame: "challenge", after: "notToday", xp: 30 },
+  howDidWe: { id: "howDidWe", title: "How Did We Get Here?", how: "In one session: every check green, a verified commit, a push, a pull request, a subagent, a web lookup and a skill or MCP call", icon: "🌀", tab: "Story", frame: "challenge", after: "furiousCocktail", isHidden: true, xp: 100 },
+  ironPick: { id: "ironPick", title: "Isn't It Iron Pick", how: "Make a git commit", icon: "🪓", tab: "Story", frame: "task", after: "acquireHardware" },
+  diamonds: { id: "diamonds", title: "Diamonds!", how: "Commit with the tests green and nothing edited since", icon: "💎", tab: "Story", frame: "task", after: "ironPick" },
+  coverMe: { id: "coverMe", title: "Cover Me with Diamonds", how: "Make 25 verified commits", icon: "👑", tab: "Story", frame: "goal", after: "diamonds", xp: 15 },
+  coverMeInDebris: { id: "coverMeInDebris", title: "Cover Me in Debris", how: "Make 250 verified commits", icon: "🌑", tab: "Story", frame: "challenge", after: "coverMe", xp: 100 },
+  enchanter: { id: "enchanter", title: "Enchanter", how: "Use a skill", icon: "📕", tab: "Story", frame: "task", after: "diamonds" },
+  hotStuff: { id: "hotStuff", title: "Hot Stuff", how: "Push your commits", icon: "🔥", tab: "Story", frame: "task", after: "ironPick" },
+  iceBucket: { id: "iceBucket", title: "Ice Bucket Challenge", how: "Resolve a merge conflict", icon: "🧊", tab: "Story", frame: "task", after: "hotStuff" },
+  eyeSpy: { id: "eyeSpy", title: "Eye Spy", how: "Start a new branch", icon: "👀", tab: "Story", frame: "task", after: "iceBucket" },
+  zombieDoctor: { id: "zombieDoctor", title: "Zombie Doctor", how: "Get a broken tool working again", icon: "💉", tab: "Story", frame: "goal", after: "stoneAge", xp: 15 },
   deeper: { id: "deeper", title: "We Need to Go Deeper", how: "Send out a subagent", icon: "🌋", tab: "Nether", frame: "task" },
   subspaceBubble: { id: "subspaceBubble", title: "Subspace Bubble", how: "Send out 3 subagents in one turn", icon: "🫧", tab: "Nether", frame: "goal", after: "deeper" },
   feelsLikeHome: { id: "feelsLikeHome", title: "Feels Like Home", how: "Send out 100 subagents", icon: "🏠", tab: "Nether", frame: "goal", after: "subspaceBubble", xp: 15 },
@@ -251,7 +251,7 @@ export const ADVANCEMENTS = {
   plantingThePast: { id: "plantingThePast", title: "Planting the Past", how: "Go green in a repository you last touched 90 or more days ago", icon: "🏺", tab: "Husbandry", frame: "task", isHidden: true },
 } satisfies Record<string, Advancement>
 
-export const TABS: readonly Tab[] = ['Minecraft', 'Nether', 'The End', 'Adventure', 'Husbandry']
+export const TABS: readonly Tab[] = ['Story', 'Nether', 'The End', 'Adventure', 'Husbandry']
 
 // Lifetime counters and the advancements their totals earn
 export const MILESTONES: Record<string, readonly (readonly [number, Advancement])[]> = {
@@ -645,7 +645,7 @@ export function titleScene(word: string): Picture {
 // and farmland, kept dark so the icons stand out. tools/sprites.py fills the
 // corners of each icon with the same color
 export const TAB_GROUND: Record<Tab, number> = {
-  Minecraft: 0x2e2e32,
+  Story: 0x2e2e32,
   Nether: 0x341416,
   'The End': 0x32301e,
   Adventure: 0x1e3020,
